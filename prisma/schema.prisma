@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum BookingStatus {
+  active
+  cancelled
+}
+
+model Slot {
+  id       String    @id @default(uuid()) @db.Uuid
+  startsAt DateTime
+  endsAt   DateTime
+  bookings Booking[]
+
+  @@index([startsAt])
+}
+
+model Booking {
+  id            String        @id @default(uuid()) @db.Uuid
+  slotId        String        @db.Uuid
+  slot          Slot          @relation(fields: [slotId], references: [id])
+  customerName  String
+  customerEmail String
+  status        BookingStatus @default(active)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([slotId])
+  @@index([slotId, status])
+}
+
+// NOTE: A partial unique index is added on top of this schema via a raw-SQL
+// migration step (see prisma/migrations/.../migration.sql):
+//   CREATE UNIQUE INDEX "Booking_slotId_active_unique"
+//   ON "Booking" ("slotId") WHERE "status" = 'active';
+// Prisma's schema language doesn't support partial (WHERE-clause) indexes
+// directly, so it's added by hand. This index is the ultimate source of
+// truth that prevents two active bookings for the same slot, even under
+// concurrent writes - see README "Concurrency strategy".
